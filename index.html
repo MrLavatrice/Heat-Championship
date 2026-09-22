@@ -68,6 +68,7 @@
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body class="min-h-screen flex flex-col font-sans antialiased text-gray-100 pb-12">
@@ -245,13 +246,9 @@
       </section>
     </main>
 
-    <footer class="mt-12 text-center text-xs text-gray-500 border-t border-gray-800/60 pt-6 space-y-2">
+    <footer class="mt-12 text-center text-xs text-gray-500 border-t border-gray-800/60 pt-6">
       <p class="font-racing text-lg text-gray-400">HEAT: PEDAL TO THE METAL &bull; TOURNAMENT MANAGER</p>
-      <p class="text-[11px]">Sistema integrato gare sincronizzato su Firebase Firestore.</p>
-      <p class="text-[10px] text-gray-400 max-w-md mx-auto">
-        <i class="fa-solid fa-circle-info mr-1 text-red-500"></i>
-        Su dispositivi iOS (Safari), puoi aggiungere l'app alla schermata Home toccando il pulsante <strong class="text-gray-300">Condividi</strong> e selezionando <strong class="text-gray-300">Aggiungi alla schermata Home</strong>.
-      </p>
+      <p class="mt-1 text-[11px]">Sistema integrato gare sincronizzato su Firebase Firestore.</p>
     </footer>
   </div>
 
@@ -259,14 +256,22 @@
   <!-- MODALS -->
   <!-- ================================================== -->
   
+  <!-- MODALE LOGIN ADMIN (Aggiornato con Nome Utente e Firebase Auth) -->
   <div id="modal-admin-login" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
     <div class="racing-card w-full max-w-md rounded-2xl p-6 border border-red-600/40 shadow-2xl relative">
       <button onclick="closeModal('modal-admin-login')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
       <h3 class="racing-font text-3xl font-bold text-white mb-2">MODALITÀ ADMIN</h3>
-      <p class="text-xs text-gray-400 mb-4">Inserisci la password di amministrazione.</p>
+      <p class="text-xs text-gray-400 mb-4">Inserisci Nome Utente e Password.</p>
       <form onsubmit="handleAdminLogin(event)" class="space-y-4">
-        <input type="password" id="admin-pass-input" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500 text-sm">
-        <div id="admin-login-error" class="text-xs text-red-500 hidden font-semibold">Password non corretta.</div>
+        <div>
+          <label class="block text-xs font-bold text-gray-300 mb-1">Nome Utente</label>
+          <input type="text" id="admin-username-input" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500 text-sm" placeholder="es. admin">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-300 mb-1">Password</label>
+          <input type="password" id="admin-pass-input" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500 text-sm">
+        </div>
+        <div id="admin-login-error" class="text-xs text-red-500 hidden font-semibold">Credenziali non valide.</div>
         <div class="flex justify-end pt-2"><button type="submit" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-lg">Accedi</button></div>
       </form>
     </div>
@@ -295,17 +300,40 @@
     </div>
   </div>
 
+  <!-- MODALE PILOTA (Aggiornato con input file e Firebase Storage) -->
   <div id="modal-driver" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
-    <div class="racing-card w-full max-w-lg rounded-2xl p-6 border border-gray-700 shadow-2xl relative">
+    <div class="racing-card w-full max-w-lg rounded-2xl p-6 border border-gray-700 shadow-2xl max-h-[90vh] overflow-y-auto relative">
       <h3 id="modal-driver-title" class="racing-font text-3xl font-bold text-white mb-4 border-b border-gray-800 pb-2">PILOTA</h3>
       <button onclick="closeModal('modal-driver')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       <form onsubmit="saveDriver(event)" class="space-y-4">
         <input type="hidden" id="driver-id">
         <div><label class="block text-xs font-bold text-gray-300 mb-1">Nome Pilota *</label><input type="text" id="driver-name" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
         <div><label class="block text-xs font-bold text-gray-300 mb-1">Scuderia</label><input type="text" id="driver-constructor" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
-        <div><label class="block text-xs font-bold text-gray-300 mb-1">URL Immagine (Opzionale)</label><input type="text" id="driver-image-url" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+        
+        <!-- Caricamento File da Dispositivo -->
+        <div>
+          <label class="block text-xs font-bold text-gray-300 mb-1">Foto da Dispositivo (Max 3MB)</label>
+          <input type="file" id="driver-file-input" accept="image/*" onchange="handleDriverFileSelect(event)" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-red-600 file:text-white hover:file:bg-red-700 cursor-pointer">
+          <div id="driver-file-error" class="text-xs text-red-500 mt-1 hidden">Il file supera la dimensione massima consentita di 3 MB.</div>
+        </div>
+
+        <div><label class="block text-xs font-bold text-gray-300 mb-1">URL Immagine (Alternativo / Opzionale)</label><input type="text" id="driver-image-url" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+        
+        <!-- Anteprima Immagine -->
+        <div class="flex items-center space-x-3 pt-1">
+          <div class="text-xs font-bold text-gray-400">Anteprima:</div>
+          <div id="driver-image-preview-container" class="w-14 h-14 rounded-full border border-gray-700 bg-gray-800 overflow-hidden flex items-center justify-center text-gray-500">
+            <i class="fa-solid fa-user text-xl"></i>
+          </div>
+        </div>
+
         <div><label class="block text-xs font-bold text-gray-300 mb-1">Punti Sponsor</label><input type="number" id="driver-sponsor-points" value="0" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
-        <div class="flex justify-end pt-2"><button type="submit" class="px-5 py-2 bg-red-600 text-white text-xs font-bold rounded-xl">Salva</button></div>
+        
+        <div class="flex justify-end pt-2">
+          <button type="submit" id="driver-save-btn" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition flex items-center space-x-2">
+            <span id="driver-save-btn-text">Salva</span>
+          </button>
+        </div>
       </form>
     </div>
   </div>
@@ -380,6 +408,7 @@
     let isAdmin = false;
     let standingsExpanded = false;
     let currentRaceEditorResults = [];
+    let selectedDriverFile = null;
 
     const HEAT_POINTS_TABLE = [9, 6, 4, 3, 2, 1]; // Punti default posizioni 1-6
 
@@ -398,6 +427,18 @@
     };
 
     function initFirestoreListeners() {
+      // Gestione stato autenticazione in tempo reale con Firebase Auth
+      firebase.auth().onAuthStateChanged((user) => {
+        if (user) {
+          isAdmin = true;
+          document.getElementById('admin-btn-text').textContent = 'Esci Admin';
+        } else {
+          isAdmin = false;
+          document.getElementById('admin-btn-text').textContent = 'Admin';
+        }
+        renderAll();
+      });
+
       db.collection("drivers").onSnapshot(snap => {
         drivers = snap.docs.map(doc => doc.data());
         renderAll();
@@ -465,7 +506,7 @@
             <h3 class="font-bold text-white text-base mb-2">${escapeHtml(item.title)}</h3>
             <p class="text-xs text-gray-300 leading-relaxed">${escapeHtml(item.text)}</p>
           </div>
-          ${isAdmin ? `<div class="mt-3 text-right"><button onclick="deleteNews('${item.id}')" class="text-xs text-red-400 hover:text-red-300"><i class="fa-solid fa-trash mr-1"></i> Elimina</button></div>` : ''}
+          ${isAdmin ? `<div class="mt-3 text-right"><button onclick="deleteNews('${item.id}')" class="text-xs text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i> Elimina</button></div>` : ''}
         </div>
       `).join('');
     }
@@ -474,13 +515,9 @@
       const container = document.getElementById('all-news-container');
       container.innerHTML = newsList.map(item => `
         <div class="p-4 rounded-xl bg-gray-900 border border-gray-800">
-          <div class="flex justify-between items-center text-xs text-red-500 font-semibold mb-1">
-            <span>Comunicato</span>
-            <span class="text-gray-500">${escapeHtml(item.date)}</span>
-          </div>
+          <div class="flex justify-between text-xs text-red-500 font-semibold mb-1"><span>Comunicato</span><span class="text-gray-500">${escapeHtml(item.date)}</span></div>
           <h3 class="font-bold text-white text-lg mb-2">${escapeHtml(item.title)}</h3>
-          <p class="text-sm text-gray-300 mb-2">${escapeHtml(item.text)}</p>
-          ${isAdmin ? `<div class="text-right pt-2 border-t border-gray-800/60"><button onclick="deleteNews('${item.id}'); closeModal('modal-all-news');" class="text-xs text-red-400 hover:text-red-300"><i class="fa-solid fa-trash mr-1"></i> Elimina</button></div>` : ''}
+          <p class="text-sm text-gray-300">${escapeHtml(item.text)}</p>
         </div>
       `).join('');
       openModal('modal-all-news');
@@ -889,6 +926,38 @@
     }
 
     // ==========================================
+    // GESTIONE FILE E IMMAGINI PILOTA (FIREBASE STORAGE)
+    // ==========================================
+    function handleDriverFileSelect(event) {
+      const file = event.target.files[0];
+      const errorEl = document.getElementById('driver-file-error');
+      const previewContainer = document.getElementById('driver-image-preview-container');
+      
+      errorEl.classList.add('hidden');
+      selectedDriverFile = null;
+
+      if (!file) return;
+
+      // Controllo sicurezza dimensione file (massimo 3 MB)
+      const maxSize = 3 * 1024 * 1024;
+      if (file.size > maxSize) {
+        errorEl.classList.remove('hidden');
+        event.target.value = '';
+        previewContainer.innerHTML = `<i class="fa-solid fa-user text-xl"></i>`;
+        return;
+      }
+
+      selectedDriverFile = file;
+
+      // Anteprima visiva immediata
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        previewContainer.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover">`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ==========================================
     // AZIONI DATABASE FIRESTORE
     // ==========================================
     function saveRace(e) {
@@ -916,14 +985,58 @@
     function saveDriver(e) {
       e.preventDefault();
       const id = document.getElementById('driver-id').value || db.collection('drivers').doc().id;
-      const driverData = {
-        id,
-        name: document.getElementById('driver-name').value.trim(),
-        constructor: document.getElementById('driver-constructor').value.trim(),
-        imageUrl: document.getElementById('driver-image-url').value.trim(),
-        sponsorPoints: Number(document.getElementById('driver-sponsor-points').value) || 0
+      const name = document.getElementById('driver-name').value.trim();
+      const constructorName = document.getElementById('driver-constructor').value.trim();
+      const imageUrlInput = document.getElementById('driver-image-url').value.trim();
+      const sponsorPoints = Number(document.getElementById('driver-sponsor-points').value) || 0;
+
+      const saveBtn = document.getElementById('driver-save-btn');
+      const btnText = document.getElementById('driver-save-btn-text');
+
+      saveBtn.disabled = true;
+      btnText.textContent = "Caricamento in corso...";
+
+      const performSave = (imageUrl) => {
+        const driverData = {
+          id,
+          name,
+          constructor: constructorName,
+          imageUrl: imageUrl || '',
+          sponsorPoints
+        };
+        db.collection('drivers').doc(id).set(driverData)
+          .then(() => {
+            saveBtn.disabled = false;
+            btnText.textContent = "Salva";
+            closeModal('modal-driver');
+          })
+          .catch((err) => {
+            console.error("Errore salvataggio pilota:", err);
+            saveBtn.disabled = false;
+            btnText.textContent = "Salva";
+            alert("Errore durante il salvataggio del pilota.");
+          });
       };
-      db.collection('drivers').doc(id).set(driverData).then(() => closeModal('modal-driver'));
+
+      if (selectedDriverFile) {
+        const storageRef = firebase.storage().ref();
+        const filePath = `drivers/${id}_${Date.now()}_${selectedDriverFile.name}`;
+        const fileRef = storageRef.child(filePath);
+
+        fileRef.put(selectedDriverFile)
+          .then(snapshot => snapshot.ref.getDownloadURL())
+          .then(downloadURL => {
+            performSave(downloadURL);
+          })
+          .catch(error => {
+            console.error("Errore upload immagine su Firebase Storage:", error);
+            alert("Errore durante il caricamento dell'immagine.");
+            saveBtn.disabled = false;
+            btnText.textContent = "Salva";
+          });
+      } else {
+        performSave(imageUrlInput);
+      }
     }
 
     function deleteDriver(id) {
@@ -954,12 +1067,22 @@
     // ==========================================
     function handleAdminLogin(e) {
       e.preventDefault();
-      if (document.getElementById('admin-pass-input').value === 'Heat 2027') {
-        isAdmin = true; document.getElementById('admin-btn-text').textContent = 'Esci Admin';
-        closeModal('modal-admin-login'); renderAll();
-      } else {
-        document.getElementById('admin-login-error').classList.remove('hidden');
-      }
+      const username = document.getElementById('admin-username-input').value.trim();
+      const password = document.getElementById('admin-pass-input').value;
+      const errorEl = document.getElementById('admin-login-error');
+      errorEl.classList.add('hidden');
+
+      const emailGenerata = username + "@heat-championship.local";
+
+      firebase.auth().signInWithEmailAndPassword(emailGenerata, password)
+        .then(() => {
+          closeModal('modal-admin-login');
+        })
+        .catch(err => {
+          console.error("Errore login admin:", err);
+          errorEl.textContent = "Credenziali non valide o errore di autenticazione.";
+          errorEl.classList.remove('hidden');
+        });
     }
 
     function updateAdminVisibility() {
@@ -979,12 +1102,52 @@
     }
     
     function openAdminModal() {
-      if (isAdmin) { isAdmin = false; document.getElementById('admin-btn-text').textContent = 'Admin'; renderAll(); } 
-      else { openModal('modal-admin-login'); document.getElementById('admin-pass-input').value=''; }
+      if (isAdmin) {
+        firebase.auth().signOut().catch(err => console.error("Errore logout:", err));
+      } else {
+        openModal('modal-admin-login');
+        document.getElementById('admin-username-input').value = '';
+        document.getElementById('admin-pass-input').value = '';
+        document.getElementById('admin-login-error').classList.add('hidden');
+      }
     }
+    
     function openAddNewsModal() { document.getElementById('news-id').value=''; document.getElementById('news-title').value=''; document.getElementById('news-text').value=''; openModal('modal-news'); }
-    function openAddDriverModal() { document.getElementById('driver-id').value=''; document.getElementById('driver-name').value=''; document.getElementById('driver-constructor').value=''; document.getElementById('driver-image-url').value=''; document.getElementById('driver-sponsor-points').value='0'; openModal('modal-driver'); }
-    function openEditDriverModal(id) { const d=drivers.find(x=>x.id===id); if(!d)return; document.getElementById('driver-id').value=d.id; document.getElementById('driver-name').value=d.name; document.getElementById('driver-constructor').value=d.constructor||''; document.getElementById('driver-image-url').value=d.imageUrl||''; document.getElementById('driver-sponsor-points').value=d.sponsorPoints||0; openModal('modal-driver'); }
+    
+    function openAddDriverModal() { 
+      document.getElementById('driver-id').value=''; 
+      document.getElementById('driver-name').value=''; 
+      document.getElementById('driver-constructor').value=''; 
+      document.getElementById('driver-image-url').value=''; 
+      document.getElementById('driver-sponsor-points').value='0'; 
+      document.getElementById('driver-file-input').value='';
+      document.getElementById('driver-file-error').classList.add('hidden');
+      document.getElementById('driver-image-preview-container').innerHTML = `<i class="fa-solid fa-user text-xl"></i>`;
+      selectedDriverFile = null;
+      openModal('modal-driver'); 
+    }
+    
+    function openEditDriverModal(id) { 
+      const d = drivers.find(x => x.id === id); 
+      if (!d) return; 
+      document.getElementById('driver-id').value = d.id; 
+      document.getElementById('driver-name').value = d.name; 
+      document.getElementById('driver-constructor').value = d.constructor || ''; 
+      document.getElementById('driver-image-url').value = d.imageUrl || ''; 
+      document.getElementById('driver-sponsor-points').value = d.sponsorPoints || 0; 
+      document.getElementById('driver-file-input').value = '';
+      document.getElementById('driver-file-error').classList.add('hidden');
+      selectedDriverFile = null;
+
+      const previewContainer = document.getElementById('driver-image-preview-container');
+      if (d.imageUrl && d.imageUrl.trim().length > 0) {
+        previewContainer.innerHTML = `<img src="${escapeHtml(d.imageUrl)}" class="w-full h-full object-cover">`;
+      } else {
+        previewContainer.innerHTML = `<i class="fa-solid fa-user text-xl"></i>`;
+      }
+
+      openModal('modal-driver'); 
+    }
   </script>
 </body>
 </html>
