@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HEAT: Pedal to the Metal - Championship Manager</title>
+  
+  <!-- Configurazione PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#e10600">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            racing: ['Teko', 'sans-serif'],
+          },
+          colors: {
+            heat: {
+              red: '#e10600',
+              darkRed: '#8b0000',
+              black: '#0b0c10',
+              card: '#161822',
+              cardBorder: '#282b3d',
+              gold: '#f59e0b',
+              silver: '#9ca3af',
+              bronze: '#d97706',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #0b0c10;
+      color: #f3f4f6;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(225, 6, 0, 0.12) 0%, transparent 60%),
+        linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(11,12,16,1));
+      background-attachment: fixed;
+    }
+    .racing-font { font-family: 'Teko', sans-serif; letter-spacing: 1px; }
+    .racing-card {
+      background: linear-gradient(145deg, #181a26 0%, #11121a 100%);
+      border: 1px solid #282b3d;
+      box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+    }
+    .pos-1 { background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(180, 83, 9, 0.1) 100%); border: 2px solid #f59e0b; color: #fbbf24; text-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+    .pos-2 { background: linear-gradient(135deg, rgba(156, 163, 175, 0.25) 0%, rgba(75, 85, 99, 0.1) 100%); border: 2px solid #9ca3af; color: #e5e7eb; text-shadow: 0 0 8px rgba(156, 163, 175, 0.4); }
+    .pos-3 { background: linear-gradient(135deg, rgba(217, 119, 6, 0.25) 0%, rgba(120, 53, 15, 0.1) 100%); border: 2px solid #d97706; color: #f97316; text-shadow: 0 0 8px rgba(217, 119, 6, 0.4); }
+    .pos-std { background: rgba(31, 41, 55, 0.6); border: 1px solid #374151; color: #9ca3af; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0c10; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #e10600; }
+  </style>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased text-gray-100 pb-12">
+
+  <!-- Errore Database (Mostrato se Firebase non è configurato) -->
+  <div id="db-error-message" class="hidden flex-col items-center justify-center min-h-screen p-4 text-center">
+    <div class="racing-card p-8 rounded-2xl max-w-lg w-full border border-red-800">
+      <i class="fa-solid fa-database text-red-500 text-5xl mb-4"></i>
+      <h2 class="racing-font text-3xl font-bold text-white mb-2">DATABASE NON DISPONIBILE</h2>
+      <p class="text-gray-300 mb-4">Configura Firebase per utilizzare il campionato condiviso.</p>
+      <div class="bg-black/50 p-4 rounded-xl border border-gray-800 text-left">
+        <p class="text-xs text-gray-400 font-mono">Modifica il file HTML inserendo le credenziali reali del tuo progetto Firebase all'interno della costante <code class="text-red-400">firebaseConfig</code>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-container" class="flex flex-col flex-1 w-full hidden">
+    <header class="sticky top-0 z-40 bg-black/90 backdrop-blur-md border-b border-red-900/40 shadow-xl">
+      <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-lg bg-red-600 flex items-center justify-center text-white font-racing text-2xl font-bold shadow-lg shadow-red-600/30 transform -skew-x-12">H</div>
+          <div>
+            <h1 class="racing-font text-2xl md:text-3xl font-bold tracking-wider leading-none text-white">
+              HEAT <span class="text-red-500">PEDAL TO THE METAL</span>
+            </h1>
+            <p class="text-[10px] md:text-xs text-gray-400 font-semibold tracking-widest uppercase">Championship Manager</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="toggleWidgetMode()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 border border-gray-700 transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-desktop"></i>
+            <span class="hidden sm:inline">Widget View</span>
+          </button>
+          <button onclick="openAdminModal()" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold text-white shadow-lg shadow-red-600/20 transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-user-shield"></i>
+            <span id="admin-btn-text">Admin</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-3 sm:px-4 mt-6 flex-1 space-y-8 w-full">
+      <!-- NEWS -->
+      <section id="section-news" class="racing-card rounded-2xl p-4 sm:p-6 border border-gray-800">
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-800">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-newspaper text-red-500 text-xl"></i>
+            <h2 class="racing-font text-2xl sm:text-3xl font-bold text-white tracking-wider">NEWS & AGGIORNAMENTI</h2>
+          </div>
+          <div id="admin-news-actions" class="hidden">
+            <button onclick="openAddNewsModal()" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition">
+              <i class="fa-solid fa-plus mr-1"></i> Nuova News
+            </button>
+          </div>
+        </div>
+        <div id="news-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Ultime 2 news -->
+        </div>
+        <div id="btn-all-news-container" class="mt-4 text-center hidden">
+          <button onclick="openAllNewsModal()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-300 rounded-xl border border-gray-700 transition">
+            <i class="fa-solid fa-list mr-1"></i> TUTTE LE NEWS
+          </button>
+        </div>
+      </section>
+
+      <!-- RISULTATI GARA -->
+      <section id="section-race-results" class="racing-card rounded-2xl p-4 sm:p-6 border border-gray-800">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-800">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-widest text-red-500">Calendario Gare</span>
+            <h2 id="race-display-title" class="racing-font text-2xl sm:text-3xl font-bold text-white tracking-wider leading-none">RISULTATI GARA</h2>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end space-x-2">
+            <button id="btn-prev-race" onclick="navigateRace(-1)" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-30 border border-gray-700 text-xs font-bold text-gray-200 transition">
+              <i class="fa-solid fa-chevron-left mr-1"></i> Precedente
+            </button>
+            <span id="race-index-indicator" class="text-xs font-mono font-bold text-gray-400 px-2">Gara 0 di 0</span>
+            <button id="btn-next-race" onclick="navigateRace(1)" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 disabled:opacity-30 border border-gray-700 text-xs font-bold text-gray-200 transition">
+              Successiva <i class="fa-solid fa-chevron-right ml-1"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="admin-race-controls" class="hidden mb-4 p-3 bg-red-950/30 border border-red-800/50 rounded-xl flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-bold text-red-400 flex items-center"><i class="fa-solid fa-gear mr-1.5"></i> Gestione Gare Admin</span>
+          <div class="flex items-center space-x-2">
+            <button onclick="openAddRaceModal()" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition">Nuova Gara</button>
+            <button onclick="openEditRaceModal()" class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold rounded-lg transition">Modifica</button>
+            <button onclick="deleteCurrentRace()" class="px-2.5 py-1 bg-red-900/60 hover:bg-red-900 text-red-200 text-xs font-bold rounded-lg transition">Elimina</button>
+          </div>
+        </div>
+
+        <div id="race-details-card" class="mb-5 p-3 sm:p-4 rounded-xl bg-gray-900/80 border border-gray-800 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-500 text-lg font-bold">
+              <i class="fa-solid fa-flag-checkered"></i>
+            </div>
+            <div>
+              <h3 id="race-card-circuit" class="text-lg font-bold text-white leading-tight">--</h3>
+              <p id="race-card-date" class="text-xs text-gray-400"><i class="fa-regular fa-calendar mr-1"></i> Data non definita</p>
+            </div>
+          </div>
+          <div id="race-card-status-badge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-gray-800 text-gray-400 border border-gray-700">Stato sconosciuto</div>
+        </div>
+        <div id="race-results-content"></div>
+      </section>
+
+      <!-- CLASSIFICA GENERALE -->
+      <section id="section-standings" class="racing-card rounded-2xl p-4 sm:p-6 border border-gray-800">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-gray-800">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-trophy text-amber-400 text-xl sm:text-2xl"></i>
+            <h2 class="racing-font text-2xl sm:text-3xl font-bold text-white tracking-wider">CLASSIFICA GENERALE</h2>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="text-[11px] sm:text-xs text-gray-400 uppercase tracking-wider border-b border-gray-800 bg-black/40">
+                <th class="py-2.5 px-3 text-center w-12">POS</th>
+                <th class="py-2.5 px-3">PILOTA</th>
+                <th class="py-2.5 px-3 text-center">ULTIME 3 GARE</th>
+                <th class="py-2.5 px-3 text-right">PUNTI</th>
+              </tr>
+            </thead>
+            <tbody id="standings-tbody" class="divide-y divide-gray-800/60 font-medium text-sm"></tbody>
+          </table>
+        </div>
+        <div class="mt-4 text-center">
+          <button id="btn-toggle-standings" onclick="toggleStandingsExpand()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-300 rounded-xl border border-gray-700 transition">
+            Mostra classifica completa
+          </button>
+        </div>
+      </section>
+
+      <!-- EXTRA STATS -->
+      <section id="section-extra-stats" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="racing-card rounded-2xl p-4 sm:p-5 border border-gray-800">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-800">
+            <h3 class="racing-font text-2xl font-bold text-white tracking-wider"><i class="fa-solid fa-award text-amber-500 mr-2"></i>CLASSIFICA PODI</h3>
+          </div>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-800">
+                <th class="pb-2 text-center w-10">POS</th><th class="pb-2">PILOTA</th><th class="pb-2 text-center">1°/2°/3°</th><th class="pb-2 text-right">TOT</th>
+              </tr>
+            </thead>
+            <tbody id="podiums-tbody" class="divide-y divide-gray-800/50"></tbody>
+          </table>
+        </div>
+        <div class="racing-card rounded-2xl p-4 sm:p-5 border border-gray-800">
+          <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-800">
+            <h3 class="racing-font text-2xl font-bold text-white tracking-wider"><i class="fa-solid fa-handshake text-red-500 mr-2"></i>PUNTI SPONSOR</h3>
+          </div>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="text-[10px] text-gray-400 uppercase tracking-wider border-b border-gray-800">
+                <th class="pb-2 text-center w-10">POS</th><th class="pb-2">PILOTA</th><th class="pb-2 text-right">PUNTI</th>
+              </tr>
+            </thead>
+            <tbody id="sponsor-tbody" class="divide-y divide-gray-800/50"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PARTECIPANTI -->
+      <section id="section-participants" class="racing-card rounded-2xl p-4 sm:p-6 border border-gray-800">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-800">
+          <h2 class="racing-font text-2xl sm:text-3xl font-bold text-white tracking-wider"><i class="fa-solid fa-users text-red-500 mr-2"></i>PARTECIPANTI</h2>
+          <div id="admin-driver-actions" class="hidden">
+            <button onclick="openAddDriverModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition">Aggiungi Pilota</button>
+          </div>
+        </div>
+        <div id="drivers-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </section>
+    </main>
+
+    <footer class="mt-12 text-center text-xs text-gray-500 border-t border-gray-800/60 pt-6">
+      <p class="font-racing text-lg text-gray-400">HEAT: PEDAL TO THE METAL &bull; TOURNAMENT MANAGER</p>
+      <p class="mt-1 text-[11px]">Sistema integrato gare sincronizzato su Firebase Firestore.</p>
+    </footer>
+  </div>
+
+  <!-- ================================================== -->
+  <!-- MODALS -->
+  <!-- ================================================== -->
+  
+  <div id="modal-admin-login" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="racing-card w-full max-w-md rounded-2xl p-6 border border-red-600/40 shadow-2xl relative">
+      <button onclick="closeModal('modal-admin-login')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      <h3 class="racing-font text-3xl font-bold text-white mb-2">MODALITÀ ADMIN</h3>
+      <p class="text-xs text-gray-400 mb-4">Inserisci la password (default: heat2026).</p>
+      <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+        <input type="password" id="admin-pass-input" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-red-500 text-sm">
+        <div id="admin-login-error" class="text-xs text-red-500 hidden font-semibold">Password non corretta.</div>
+        <div class="flex justify-end pt-2"><button type="submit" class="px-5 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-lg">Accedi</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-all-news" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="racing-card w-full max-w-3xl rounded-2xl p-6 border border-gray-700 shadow-2xl max-h-[90vh] flex flex-col relative">
+      <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-800">
+        <h3 class="racing-font text-3xl font-bold text-white">TUTTE LE NEWS</h3>
+        <button onclick="closeModal('modal-all-news')" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div id="all-news-container" class="overflow-y-auto space-y-4 pr-2 flex-1"></div>
+    </div>
+  </div>
+
+  <div id="modal-news" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="racing-card w-full max-w-md rounded-2xl p-6 border border-gray-700 shadow-2xl relative">
+      <h3 id="modal-news-title" class="racing-font text-3xl font-bold text-white mb-4">NUOVA NEWS</h3>
+      <button onclick="closeModal('modal-news')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      <form onsubmit="saveNews(event)" class="space-y-4">
+        <input type="hidden" id="news-id">
+        <input type="text" id="news-title" required placeholder="Titolo" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm">
+        <textarea id="news-text" required rows="4" placeholder="Testo" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></textarea>
+        <div class="flex justify-end pt-2"><button type="submit" class="px-5 py-2 bg-red-600 text-white text-xs font-bold rounded-xl">Pubblica</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-driver" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="racing-card w-full max-w-lg rounded-2xl p-6 border border-gray-700 shadow-2xl relative">
+      <h3 id="modal-driver-title" class="racing-font text-3xl font-bold text-white mb-4 border-b border-gray-800 pb-2">PILOTA</h3>
+      <button onclick="closeModal('modal-driver')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      <form onsubmit="saveDriver(event)" class="space-y-4">
+        <input type="hidden" id="driver-id">
+        <div><label class="block text-xs font-bold text-gray-300 mb-1">Nome Pilota *</label><input type="text" id="driver-name" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+        <div><label class="block text-xs font-bold text-gray-300 mb-1">Scuderia</label><input type="text" id="driver-constructor" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+        <div><label class="block text-xs font-bold text-gray-300 mb-1">URL Immagine (Opzionale)</label><input type="text" id="driver-image-url" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+        <div><label class="block text-xs font-bold text-gray-300 mb-1">Punti Sponsor</label><input type="number" id="driver-sponsor-points" value="0" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+        <div class="flex justify-end pt-2"><button type="submit" class="px-5 py-2 bg-red-600 text-white text-xs font-bold rounded-xl">Salva</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="modal-race" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="racing-card w-full max-w-2xl rounded-2xl p-6 border border-gray-700 shadow-2xl max-h-[92vh] overflow-y-auto relative">
+      <h3 id="modal-race-title" class="racing-font text-3xl font-bold text-white mb-4 border-b border-gray-800 pb-2">GESTIONE GARA</h3>
+      <button onclick="closeModal('modal-race')" class="absolute top-4 right-4 text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      <form onsubmit="saveRace(event)" class="space-y-4">
+        <input type="hidden" id="race-id">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><label class="block text-xs font-bold text-gray-300 mb-1">Nome Gara *</label><input type="text" id="race-name" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+          <div><label class="block text-xs font-bold text-gray-300 mb-1">Circuito</label><input type="text" id="race-circuit" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+          <div><label class="block text-xs font-bold text-gray-300 mb-1">Data</label><input type="date" id="race-date" required class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm"></div>
+          <div>
+            <label class="block text-xs font-bold text-gray-300 mb-1">Stato</label>
+            <select id="race-status" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm">
+              <option value="completed">Completata (Risultati)</option>
+              <option value="scheduled">Programmata</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-800">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-bold text-red-400 uppercase tracking-wider">Classifica Piloti</h4>
+            <span class="text-[10px] text-gray-400">Punteggi (9, 6, 4, 3, 2, 1) assegnati in automatico.</span>
+          </div>
+          <div id="race-results-editor" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+        </div>
+        <div class="flex justify-end space-x-2 pt-4">
+          <button type="submit" class="px-5 py-2 bg-red-600 text-white text-xs font-bold rounded-xl shadow-lg">Salva Gara</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // CONFIGURAZIONE FIREBASE
+    // ==========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyDIcxrQ0TBqHMDihrXycqeRBNf804bTIDs",
+      authDomain: "heat-championship-6900b.firebaseapp.com",
+      projectId: "heat-championship-6900b",
+      storageBucket: "heat-championship-6900b.firebasestorage.app",
+      messagingSenderId: "4269458043",
+      appId: "1:4269458043:web:8167b7793d8e17f4a818de",
+      measurementId: "G-J988DPZLG7"
+    };
+
+    let db = null;
+    let isDbAvailable = false;
+
+    if (firebaseConfig.apiKey !== "INSERIRE_API_KEY") {
+      try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        isDbAvailable = true;
+      } catch (e) {
+        console.error("Errore inizializzazione Firebase:", e);
+      }
+    }
+
+    // ==========================================
+    // STATO GLOBALE
+    // ==========================================
+    let drivers = [];
+    let races = [];
+    let newsList = [];
+    let currentRaceIndex = 0;
+    let isAdmin = false;
+    let standingsExpanded = false;
+    let currentRaceEditorResults = [];
+
+    const HEAT_POINTS_TABLE = [9, 6, 4, 3, 2, 1]; // Punti default posizioni 1-6
+
+    // ==========================================
+    // INIT
+    // ==========================================
+    window.onload = function() {
+      if (!isDbAvailable) {
+        document.getElementById('db-error-message').classList.remove('hidden');
+        return;
+      }
+      
+      document.getElementById('app-container').classList.remove('hidden');
+      document.getElementById('app-container').classList.add('flex');
+      initFirestoreListeners();
+    };
+
+    function initFirestoreListeners() {
+      db.collection("drivers").onSnapshot(snap => {
+        drivers = snap.docs.map(doc => doc.data());
+        renderAll();
+      }, err => console.error(err));
+
+      db.collection("races").onSnapshot(snap => {
+        races = snap.docs.map(doc => doc.data());
+        races.sort((a, b) => new Date(a.date) - new Date(b.date)); // Ordina per data
+        setLatestCompletedRaceIndex();
+        renderAll();
+      }, err => console.error(err));
+
+      db.collection("news").onSnapshot(snap => {
+        newsList = snap.docs.map(doc => doc.data());
+        newsList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Recenti prima
+        renderNews();
+      }, err => console.error(err));
+    }
+
+    function normalizeResult(res) {
+      if (res.status) return res;
+      return { ...res, status: 'FINISHED', points: res.points || 0, position: res.position };
+    }
+
+    function setLatestCompletedRaceIndex() {
+      if (!races || races.length === 0) { currentRaceIndex = 0; return; }
+      let lastCompletedIdx = -1;
+      for (let i = 0; i < races.length; i++) {
+        if (races[i].status === 'completed') lastCompletedIdx = i;
+      }
+      currentRaceIndex = lastCompletedIdx !== -1 ? lastCompletedIdx : races.length - 1;
+    }
+
+    function renderAll() {
+      renderRaceResults();
+      renderOverallStandings();
+      renderExtraStandings();
+      renderParticipants();
+      updateAdminVisibility();
+    }
+
+    // ==========================================
+    // NEWS LOGIC
+    // ==========================================
+    function renderNews() {
+      const container = document.getElementById('news-container');
+      const btnAll = document.getElementById('btn-all-news-container');
+
+      if (!newsList || newsList.length === 0) {
+        container.innerHTML = `<div class="col-span-full text-center py-6 text-gray-500 text-sm">Nessuna news pubblicata.</div>`;
+        btnAll.classList.add('hidden');
+        return;
+      }
+
+      btnAll.classList.remove('hidden');
+      const displayNews = newsList.slice(0, 2);
+
+      container.innerHTML = displayNews.map(item => `
+        <div class="p-4 rounded-xl bg-gray-900/90 border border-gray-800 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between text-xs text-red-500 font-semibold mb-1">
+              <span><i class="fa-regular fa-newspaper mr-1"></i> Comunicato</span>
+              <span class="text-gray-500">${escapeHtml(item.date)}</span>
+            </div>
+            <h3 class="font-bold text-white text-base mb-2">${escapeHtml(item.title)}</h3>
+            <p class="text-xs text-gray-300 leading-relaxed">${escapeHtml(item.text)}</p>
+          </div>
+          ${isAdmin ? `<div class="mt-3 text-right"><button onclick="deleteNews('${item.id}')" class="text-xs text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i> Elimina</button></div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function openAllNewsModal() {
+      const container = document.getElementById('all-news-container');
+      container.innerHTML = newsList.map(item => `
+        <div class="p-4 rounded-xl bg-gray-900 border border-gray-800">
+          <div class="flex justify-between text-xs text-red-500 font-semibold mb-1"><span>Comunicato</span><span class="text-gray-500">${escapeHtml(item.date)}</span></div>
+          <h3 class="font-bold text-white text-lg mb-2">${escapeHtml(item.title)}</h3>
+          <p class="text-sm text-gray-300">${escapeHtml(item.text)}</p>
+        </div>
+      `).join('');
+      openModal('modal-all-news');
+    }
+
+    // ==========================================
+    // RACE LOGIC
+    // ==========================================
+    function navigateRace(direction) {
+      currentRaceIndex += direction;
+      renderRaceResults();
+    }
+
+    function renderRaceResults() {
+      const titleEl = document.getElementById('race-display-title');
+      const circuitEl = document.getElementById('race-card-circuit');
+      const dateEl = document.getElementById('race-card-date');
+      const statusBadge = document.getElementById('race-card-status-badge');
+      const indicatorEl = document.getElementById('race-index-indicator');
+      const contentEl = document.getElementById('race-results-content');
+      
+      const btnPrev = document.getElementById('btn-prev-race');
+      const btnNext = document.getElementById('btn-next-race');
+
+      const totalRaces = races.length;
+      btnPrev.disabled = currentRaceIndex <= 0;
+      btnNext.disabled = currentRaceIndex >= totalRaces;
+      indicatorEl.textContent = totalRaces > 0 ? `Gara ${currentRaceIndex + 1} di ${totalRaces}` : `Gara 0 di 0`;
+
+      const currentRace = races[currentRaceIndex];
+
+      if (!currentRace) {
+        titleEl.textContent = `RISULTATI GARA ${currentRaceIndex + 1}`;
+        circuitEl.textContent = `Gara Non Programmata`;
+        dateEl.innerHTML = `<i class="fa-regular fa-calendar mr-1"></i> Data da destinarsi`;
+        statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-yellow-950/40 text-yellow-400 border border-yellow-800/40";
+        statusBadge.textContent = "Non Programmata";
+        contentEl.innerHTML = `<div class="py-12 text-center text-gray-400">Gara successiva non ancora programmata.</div>`;
+        return;
+      }
+
+      titleEl.textContent = `RISULTATI GARA: ${currentRace.name}`;
+      circuitEl.textContent = currentRace.circuit || currentRace.name;
+      dateEl.innerHTML = `<i class="fa-regular fa-calendar mr-1"></i> ${currentRace.date}`;
+
+      if (currentRace.status === 'scheduled') {
+        statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-950/40 text-blue-400 border border-blue-800/40";
+        statusBadge.textContent = "Programmata";
+        contentEl.innerHTML = `<div class="py-10 text-center text-gray-400">I risultati verranno pubblicati al termine.</div>`;
+        return;
+      }
+
+      statusBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-950/40 text-green-400 border border-green-800/40";
+      statusBadge.textContent = "Completata";
+
+      const results = currentRace.results || [];
+      const sortedResults = results.map(normalizeResult).sort((a, b) => {
+        const order = { "FINISHED": 1, "DNF": 2, "DNS": 3 };
+        if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+        if (a.status === "DNS") return 0;
+        return a.position - b.position;
+      });
+
+      if (sortedResults.length === 0) {
+        contentEl.innerHTML = `<div class="py-8 text-center text-gray-500 text-xs">Nessun risultato inserito.</div>`;
+        return;
+      }
+
+      const hasDNS = sortedResults.some(r => r.status === 'DNS');
+      const hasDNF = sortedResults.some(r => r.status === 'DNF');
+
+      contentEl.innerHTML = `
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="text-[11px] text-gray-400 uppercase border-b border-gray-800 bg-black/40">
+                <th class="py-2.5 px-3 text-center w-12">POS</th>
+                <th class="py-2.5 px-3">PILOTA</th>
+                <th class="py-2.5 px-3 text-right">PUNTI</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/60">
+              ${sortedResults.map((res) => {
+                const driver = drivers.find(d => d.id === res.driverId) || { name: 'Sconosciuto', imageUrl: '' };
+                let posHtml, pointsHtml;
+
+                if (res.status === 'FINISHED') {
+                  const posClass = res.position === 1 ? 'pos-1' : res.position === 2 ? 'pos-2' : res.position === 3 ? 'pos-3' : 'pos-std';
+                  posHtml = `<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg font-racing text-lg font-bold ${posClass}">${res.position}</span>`;
+                  pointsHtml = `+${res.points} <span class="text-xs text-gray-400 font-sans">PT</span>`;
+                } else if (res.status === 'DNF') {
+                  posHtml = `<span class="inline-flex items-center justify-center w-8 h-8 rounded-lg font-racing text-sm font-bold bg-gray-800 text-gray-500 border border-gray-700">${res.position}</span>`;
+                  pointsHtml = `<span class="text-red-500 font-sans font-bold text-sm">DNF</span>`;
+                } else {
+                  posHtml = `<span class="text-gray-600 font-sans font-bold text-xs">DNS</span>`;
+                  pointsHtml = `<span class="text-gray-600 font-sans font-bold text-sm">DNS</span>`;
+                }
+
+                return `
+                  <tr class="hover:bg-gray-800/40">
+                    <td class="py-3 px-3 text-center">${posHtml}</td>
+                    <td class="py-3 px-3">
+                      <div class="flex items-center space-x-3">
+                        ${renderAvatarHtml(driver.imageUrl, driver.name, 'w-10 h-10')}
+                        <div>
+                          <div class="text-base font-bold text-white leading-tight">${escapeHtml(driver.name)}</div>
+                          <div class="text-[11px] text-gray-400">${escapeHtml(driver.constructor || 'Nessun Team')}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="py-3 px-3 text-right font-racing text-2xl font-bold text-red-500">${pointsHtml}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        ${ (hasDNS || hasDNF) ? `
+          <div class="mt-4 pt-3 border-t border-gray-800 flex items-center justify-center space-x-4 text-[10px] text-gray-500 uppercase font-semibold">
+            ${hasDNF ? '<span><span class="text-red-500 mr-1">DNF</span> Did Not Finish</span>' : ''}
+            ${hasDNS ? '<span><span class="text-gray-600 mr-1">DNS</span> Did Not Start</span>' : ''}
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // ==========================================
+    // STANDINGS E STATISTICHE
+    // ==========================================
+    function calculateDerivedDriverStats() {
+      const completedRaces = races.filter(r => r.status === 'completed');
+
+      return drivers.map(driver => {
+        let totalPoints = 0, wins = 0, podiums = 0;
+        let recentStatuses = [];
+
+        completedRaces.forEach(race => {
+          const res = race.results ? race.results.find(r => r.driverId === driver.id) : null;
+          if (res) {
+            const norm = normalizeResult(res);
+            totalPoints += Number(norm.points) || 0;
+            if (norm.status === 'FINISHED') {
+              if (norm.position === 1) wins++;
+              if (norm.position >= 1 && norm.position <= 3) podiums++;
+            }
+            recentStatuses.push(norm);
+          }
+        });
+
+        return { ...driver, totalPoints, wins, podiums, recentStatuses };
+      });
+    }
+
+    function getPosValueForSort(res) {
+      if (!res) return 9999;
+      if (res.status === 'DNS') return 1000;
+      if (res.status === 'DNF') return 900 + (res.position || 99); 
+      return res.position || 999;
+    }
+
+    function getSortedStandings() {
+      const stats = calculateDerivedDriverStats();
+      stats.sort((a, b) => {
+        if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.podiums !== a.podiums) return b.podiums - a.podiums;
+        
+        const aRecent = [...a.recentStatuses].reverse();
+        const bRecent = [...b.recentStatuses].reverse();
+        const maxLen = Math.max(aRecent.length, bRecent.length);
+
+        for (let i = 0; i < maxLen; i++) {
+          const valA = getPosValueForSort(aRecent[i]);
+          const valB = getPosValueForSort(bRecent[i]);
+          if (valA !== valB) return valA - valB;
+        }
+        return a.name.localeCompare(b.name);
+      });
+      return stats;
+    }
+
+    function renderOverallStandings() {
+      const tbody = document.getElementById('standings-tbody');
+      const sorted = getSortedStandings();
+
+      if (sorted.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-gray-500 text-xs">Nessun pilota registrato.</td></tr>`;
+        return;
+      }
+
+      const displayList = standingsExpanded ? sorted : sorted.slice(0, 5);
+
+      tbody.innerHTML = displayList.map((driver, idx) => {
+        const rank = idx + 1;
+        const posClass = rank === 1 ? 'pos-1' : rank === 2 ? 'pos-2' : rank === 3 ? 'pos-3' : 'pos-std';
+
+        const recentBadges = driver.recentStatuses.slice(-3).map(res => {
+          if (res.status === 'DNS') return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border bg-gray-900 text-gray-500 border-gray-800">DNS</span>`;
+          if (res.status === 'DNF') return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border bg-red-950/40 text-red-500 border-red-900/50">DNF</span>`;
+          return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border ${res.position === 1 ? 'bg-amber-950/60 text-amber-300 border-amber-600/40' : res.position <= 3 ? 'bg-orange-950/60 text-orange-300 border-orange-600/40' : 'bg-gray-800 text-gray-300 border-gray-700'}">${res.position}°</span>`;
+        }).join(' <span class="text-gray-600 text-[10px]">|</span> ');
+
+        return `
+          <tr class="hover:bg-gray-800/40">
+            <td class="py-3 px-3 text-center"><span class="inline-flex items-center justify-center w-8 h-8 rounded-lg font-racing text-lg font-bold ${posClass}">${rank}</span></td>
+            <td class="py-3 px-3">
+              <div class="flex items-center space-x-3">
+                ${renderAvatarHtml(driver.imageUrl, driver.name, 'w-11 h-11')}
+                <div>
+                  <div class="text-base font-bold text-white leading-tight">${escapeHtml(driver.name)}</div>
+                  <div class="text-[11px] text-gray-400">${escapeHtml(driver.constructor || 'Nessun Team')}</div>
+                </div>
+              </div>
+            </td>
+            <td class="py-3 px-3 text-center whitespace-nowrap">${recentBadges || `<span class="text-gray-500 text-xs italic">-</span>`}</td>
+            <td class="py-3 px-3 text-right font-racing text-2xl font-bold text-red-500">${driver.totalPoints} <span class="text-xs text-gray-400 font-sans">PT</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      const btnToggle = document.getElementById('btn-toggle-standings');
+      if (sorted.length <= 5) btnToggle.classList.add('hidden');
+      else {
+        btnToggle.classList.remove('hidden');
+        btnToggle.textContent = standingsExpanded ? `Nascondi classifica` : `Mostra classifica completa (${sorted.length})`;
+      }
+    }
+
+    function renderExtraStandings() {
+      const stats = calculateDerivedDriverStats();
+      const podiumSorted = [...stats].sort((a, b) => {
+        if (b.podiums !== a.podiums) return b.podiums - a.podiums;
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        return a.name.localeCompare(b.name);
+      });
+
+      document.getElementById('podiums-tbody').innerHTML = podiumSorted.map((driver, idx) => {
+        let firsts = 0, seconds = 0, thirds = 0;
+        driver.recentStatuses.forEach(r => {
+          if (r.status === 'FINISHED') {
+            if (r.position === 1) firsts++;
+            if (r.position === 2) seconds++;
+            if (r.position === 3) thirds++;
+          }
+        });
+        const posClass = idx === 0 ? 'pos-1' : idx === 1 ? 'pos-2' : idx === 2 ? 'pos-3' : 'pos-std';
+
+        return `
+          <tr class="hover:bg-gray-800/30">
+            <td class="py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded font-racing font-bold text-xs ${posClass}">${idx+1}</span></td>
+            <td class="py-2.5"><div class="flex items-center space-x-2">${renderAvatarHtml(driver.imageUrl, driver.name, 'w-7 h-7')}<span class="font-semibold text-white text-xs">${escapeHtml(driver.name)}</span></div></td>
+            <td class="py-2.5 text-center text-xs font-mono text-gray-300"><span class="text-amber-400">${firsts}</span> / <span class="text-gray-300">${seconds}</span> / <span class="text-orange-400">${thirds}</span></td>
+            <td class="py-2.5 text-right font-racing text-lg font-bold text-amber-400">${driver.podiums}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const sponsorSorted = [...drivers].sort((a, b) => (Number(b.sponsorPoints) || 0) - (Number(a.sponsorPoints) || 0));
+      document.getElementById('sponsor-tbody').innerHTML = sponsorSorted.map((driver, idx) => {
+        const posClass = idx === 0 ? 'pos-1' : idx === 1 ? 'pos-2' : idx === 2 ? 'pos-3' : 'pos-std';
+        return `
+          <tr class="hover:bg-gray-800/30">
+            <td class="py-2.5 text-center"><span class="inline-flex items-center justify-center w-6 h-6 rounded font-racing font-bold text-xs ${posClass}">${idx+1}</span></td>
+            <td class="py-2.5"><div class="flex items-center space-x-2">${renderAvatarHtml(driver.imageUrl, driver.name, 'w-7 h-7')}<span class="font-semibold text-white text-xs">${escapeHtml(driver.name)}</span></div></td>
+            <td class="py-2.5 text-right font-racing text-lg font-bold text-red-400">${driver.sponsorPoints || 0} <span class="text-[10px] font-sans text-gray-400">PTS</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderParticipants() {
+      const grid = document.getElementById('drivers-grid');
+      const stats = calculateDerivedDriverStats();
+      if (drivers.length === 0) { grid.innerHTML = `<div class="col-span-full text-center text-gray-500 text-xs">Nessun pilota registrato.</div>`; return; }
+
+      grid.innerHTML = drivers.map(driver => {
+        const s = stats.find(x => x.id === driver.id) || { totalPoints: 0 };
+        return `
+          <div class="racing-card rounded-xl p-4 border border-gray-800 flex items-center justify-between hover:border-gray-700">
+            <div class="flex items-center space-x-3">
+              ${renderAvatarHtml(driver.imageUrl, driver.name, 'w-12 h-12')}
+              <div>
+                <h4 class="font-bold text-white text-sm">${escapeHtml(driver.name)}</h4>
+                <p class="text-[10px] text-gray-400">${escapeHtml(driver.constructor || 'Nessuna Scuderia')}</p>
+                <div class="mt-1"><span class="text-[10px] bg-red-950/50 text-red-400 px-1.5 py-0.5 rounded border border-red-800/40">${s.totalPoints} PT</span></div>
+              </div>
+            </div>
+            ${isAdmin ? `
+              <div class="flex flex-col space-y-1">
+                <button onclick="openEditDriverModal('${driver.id}')" class="p-1.5 text-xs bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg"><i class="fa-solid fa-pen-to-square"></i></button>
+                <button onclick="deleteDriver('${driver.id}')" class="p-1.5 text-xs bg-red-950/50 hover:bg-red-900 text-red-300 rounded-lg"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderAvatarHtml(url, name, sizeClass = 'w-10 h-10') {
+      if (url && url.trim().length > 0) return `<div class="${sizeClass} rounded-full overflow-hidden border border-gray-700 bg-gray-800 shrink-0"><img src="${escapeHtml(url)}" class="w-full h-full object-cover"></div>`;
+      return `<div class="${sizeClass} rounded-full border border-gray-700 bg-gray-800/80 flex items-center justify-center text-gray-400 shrink-0"><i class="fa-solid fa-user text-sm"></i></div>`;
+    }
+
+    // ==========================================
+    // EDITOR GARA (ADMIN)
+    // ==========================================
+    function openAddRaceModal() {
+      document.getElementById('race-id').value = '';
+      document.getElementById('race-name').value = '';
+      document.getElementById('race-circuit').value = '';
+      document.getElementById('race-date').value = new Date().toISOString().split('T')[0];
+      
+      currentRaceEditorResults = drivers.map(d => ({ driverId: d.id, status: 'FINISHED', position: null, points: 0 }));
+      recalculatePositionsAndPoints();
+      renderRaceResultsEditor();
+      openModal('modal-race');
+    }
+
+    function openEditRaceModal() {
+      const race = races[currentRaceIndex];
+      if (!race) return;
+      document.getElementById('race-id').value = race.id;
+      document.getElementById('race-name').value = race.name;
+      document.getElementById('race-circuit').value = race.circuit || '';
+      document.getElementById('race-date').value = race.date || '';
+      document.getElementById('race-status').value = race.status || 'completed';
+
+      let res = (race.results || []).map(normalizeResult);
+      res.sort((a, b) => {
+        const map = { "FINISHED": 1, "DNF": 2, "DNS": 3 };
+        if (map[a.status] !== map[b.status]) return map[a.status] - map[b.status];
+        if (a.status === 'DNS') return 0;
+        return a.position - b.position;
+      });
+
+      const existIds = res.map(r => r.driverId);
+      const newDrivers = drivers.filter(d => !existIds.includes(d.id)).map(d => ({ driverId: d.id, status: 'DNS', position: null, points: 0 }));
+      currentRaceEditorResults = [...res, ...newDrivers];
+      recalculatePositionsAndPoints();
+      renderRaceResultsEditor();
+      openModal('modal-race');
+    }
+
+    function recalculatePositionsAndPoints() {
+      let currentPos = 1;
+      currentRaceEditorResults.forEach(res => {
+        if (res.status === 'FINISHED' || res.status === 'DNF') {
+          res.position = currentPos++;
+          if (res.status === 'FINISHED') res.points = HEAT_POINTS_TABLE[res.position - 1] || 0;
+          else res.points = 0; // DNF points = 0
+        } else {
+          res.position = null;
+          res.points = 0;
+        }
+      });
+    }
+
+    function moveDriverInEditor(index, dir) {
+      if (index + dir < 0 || index + dir >= currentRaceEditorResults.length) return;
+      const temp = currentRaceEditorResults[index];
+      currentRaceEditorResults[index] = currentRaceEditorResults[index + dir];
+      currentRaceEditorResults[index + dir] = temp;
+      recalculatePositionsAndPoints();
+      renderRaceResultsEditor();
+    }
+
+    function updateDriverStatusInEditor(index, status) {
+      currentRaceEditorResults[index].status = status;
+      recalculatePositionsAndPoints();
+      renderRaceResultsEditor();
+    }
+
+    function updateDriverPointsInEditor(index, pts) {
+      currentRaceEditorResults[index].points = parseInt(pts) || 0;
+    }
+
+    function renderRaceResultsEditor() {
+      const editor = document.getElementById('race-results-editor');
+      if(drivers.length===0) { editor.innerHTML = `<div class="text-xs text-gray-500">Nessun pilota registrato.</div>`; return;}
+      
+      editor.innerHTML = currentRaceEditorResults.map((res, i) => {
+        const d = drivers.find(x => x.id === res.driverId);
+        if (!d) return '';
+        return `
+          <div class="p-2 rounded-xl bg-gray-900 border border-gray-800 flex items-center justify-between gap-2">
+            <div class="flex items-center space-x-2 w-1/2">
+              <div class="flex flex-col">
+                <button type="button" onclick="moveDriverInEditor(${i}, -1)" class="text-gray-500 hover:text-white" ${i===0?'disabled':''}><i class="fa-solid fa-caret-up"></i></button>
+                <button type="button" onclick="moveDriverInEditor(${i}, 1)" class="text-gray-500 hover:text-white" ${i===currentRaceEditorResults.length-1?'disabled':''}><i class="fa-solid fa-caret-down"></i></button>
+              </div>
+              <span class="text-xs font-bold w-4 ${res.status === 'DNS' ? 'text-gray-600' : 'text-gray-400'}">${res.position ? res.position+'°' : '-'}</span>
+              ${renderAvatarHtml(d.imageUrl, d.name, 'w-6 h-6 hidden sm:block')}
+              <span class="text-xs font-bold text-white truncate">${escapeHtml(d.name)}</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <select onchange="updateDriverStatusInEditor(${i}, this.value)" class="bg-gray-800 border border-gray-700 rounded px-1 py-1 text-[10px] sm:text-xs text-white">
+                <option value="FINISHED" ${res.status==='FINISHED'?'selected':''}>FIN</option>
+                <option value="DNF" ${res.status==='DNF'?'selected':''}>DNF</option>
+                <option value="DNS" ${res.status==='DNS'?'selected':''}>DNS</option>
+              </select>
+              <input type="number" min="0" onchange="updateDriverPointsInEditor(${i}, this.value)" class="w-10 bg-gray-800 border border-gray-700 rounded text-center text-xs font-bold text-red-400" value="${res.points}" ${res.status !== 'FINISHED' ? 'disabled' : ''}>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // AZIONI DATABASE FIRESTORE
+    // ==========================================
+    function saveRace(e) {
+      e.preventDefault();
+      const id = document.getElementById('race-id').value || db.collection('races').doc().id;
+      const raceData = {
+        id,
+        name: document.getElementById('race-name').value.trim(),
+        circuit: document.getElementById('race-circuit').value.trim(),
+        date: document.getElementById('race-date').value,
+        status: document.getElementById('race-status').value,
+        results: currentRaceEditorResults
+      };
+      db.collection('races').doc(id).set(raceData).then(() => closeModal('modal-race'));
+    }
+
+    function deleteCurrentRace() {
+      const race = races[currentRaceIndex];
+      if (!race) return;
+      if (confirm(`Eliminare la gara "${race.name}"?`)) {
+        db.collection('races').doc(race.id).delete();
+      }
+    }
+
+    function saveDriver(e) {
+      e.preventDefault();
+      const id = document.getElementById('driver-id').value || db.collection('drivers').doc().id;
+      const driverData = {
+        id,
+        name: document.getElementById('driver-name').value.trim(),
+        constructor: document.getElementById('driver-constructor').value.trim(),
+        imageUrl: document.getElementById('driver-image-url').value.trim(),
+        sponsorPoints: Number(document.getElementById('driver-sponsor-points').value) || 0
+      };
+      db.collection('drivers').doc(id).set(driverData).then(() => closeModal('modal-driver'));
+    }
+
+    function deleteDriver(id) {
+      if (confirm("Sei sicuro di voler eliminare questo pilota?")) {
+        db.collection('drivers').doc(id).delete();
+      }
+    }
+
+    function saveNews(e) {
+      e.preventDefault();
+      const id = document.getElementById('news-id').value || db.collection('news').doc().id;
+      const newsData = {
+        id,
+        title: document.getElementById('news-title').value.trim(),
+        text: document.getElementById('news-text').value.trim(),
+        date: new Date().toLocaleDateString('it-IT'),
+        createdAt: Date.now()
+      };
+      db.collection('news').doc(id).set(newsData).then(() => closeModal('modal-news'));
+    }
+
+    function deleteNews(id) {
+      if (confirm("Eliminare questa news?")) db.collection('news').doc(id).delete();
+    }
+
+    // ==========================================
+    // UI & UTILITIES
+    // ==========================================
+    function handleAdminLogin(e) {
+      e.preventDefault();
+      if (document.getElementById('admin-pass-input').value === 'heat2026') {
+        isAdmin = true; document.getElementById('admin-btn-text').textContent = 'Esci Admin';
+        closeModal('modal-admin-login'); renderAll();
+      } else {
+        document.getElementById('admin-login-error').classList.remove('hidden');
+      }
+    }
+
+    function updateAdminVisibility() {
+      document.getElementById('admin-news-actions').classList.toggle('hidden', !isAdmin);
+      document.getElementById('admin-race-controls').classList.toggle('hidden', !isAdmin);
+      document.getElementById('admin-driver-actions').classList.toggle('hidden', !isAdmin);
+    }
+
+    function toggleWidgetMode() { document.body.classList.toggle('widget-mode'); }
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function toggleStandingsExpand() { standingsExpanded = !standingsExpanded; renderOverallStandings(); }
+    
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    
+    function openAdminModal() {
+      if (isAdmin) { isAdmin = false; document.getElementById('admin-btn-text').textContent = 'Admin'; renderAll(); } 
+      else { openModal('modal-admin-login'); document.getElementById('admin-pass-input').value=''; }
+    }
+    function openAddNewsModal() { document.getElementById('news-id').value=''; document.getElementById('news-title').value=''; document.getElementById('news-text').value=''; openModal('modal-news'); }
+    function openAddDriverModal() { document.getElementById('driver-id').value=''; document.getElementById('driver-name').value=''; document.getElementById('driver-constructor').value=''; document.getElementById('driver-image-url').value=''; document.getElementById('driver-sponsor-points').value='0'; openModal('modal-driver'); }
+    function openEditDriverModal(id) { const d=drivers.find(x=>x.id===id); if(!d)return; document.getElementById('driver-id').value=d.id; document.getElementById('driver-name').value=d.name; document.getElementById('driver-constructor').value=d.constructor||''; document.getElementById('driver-image-url').value=d.imageUrl||''; document.getElementById('driver-sponsor-points').value=d.sponsorPoints||0; openModal('modal-driver'); }
+  </script>
+</body>
+</html>

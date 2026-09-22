@@ -1,0 +1,8 @@
+{
+  "name": "HEAT Championship Manager",
+  "short_name": "HEAT Manager",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b0c10",
+  "theme_color": "#e10600"
+}
